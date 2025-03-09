@@ -1,4 +1,3 @@
-// Backend: Node.js + Express + MongoDB + NLP (ML-based Search)
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -7,13 +6,7 @@ require("dotenv").config();
 
 const app = express();
 app.use(express.json());
-app.use(
-    cors({
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        allowedHeaders: ["Content-Type"],
-    }),
-);
+app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"], allowedHeaders: ["Content-Type"] }));
 
 const EmployeeSchema = new mongoose.Schema({
     name: String,
@@ -32,23 +25,25 @@ const EmployeeSchema = new mongoose.Schema({
 
 const Employee = mongoose.model("Employee", EmployeeSchema);
 
+// NLP-based search route
 app.post("/employees/search", async (req, res) => {
     const { query } = req.body;
-    if (!query) return res.status(400).json({ error: "Search query required" });
+    if (!query) return res.status(400).json({ error: "Search query is required." });
 
     const tokenizer = new natural.WordTokenizer();
-    const words = tokenizer.tokenize(query.toLowerCase());
+    const stemmer = natural.PorterStemmer;
+    const words = tokenizer.tokenize(query.toLowerCase()).map(word => stemmer.stem(word));
 
     let filter = {};
 
     // Define valid filters
     const states = ["california", "texas", "new york", "florida"];
-    const departments = ["it", "hr", "finance", "marketing"];
-    const skills = ["react", "node.js", "python", "java", "communication"];
-    const educationLevels = ["mba", "bba", "b.tech", "m.tech"];
-    const badWords = ["badword1", "badword2"]; // Add inappropriate words
+    const departments = ["it", "hr", "engineering", "marketing", "sales"];
+    const skills = ["react", "node.js", "python", "java", "javascript", "sql", "communication"];
+    const educationLevels = ["mba", "bba", "b.tech", "m.tech", "b.sc"];
+    const badWords = ["badword1", "badword2"];
 
-    // Check for bad words
+    // Bad Words Filtering
     if (words.some(word => badWords.includes(word))) {
         return res.status(400).json({ error: "Please ask a valid question." });
     }
@@ -58,18 +53,16 @@ app.post("/employees/search", async (req, res) => {
     if (matchedState) filter.state = new RegExp(matchedState, "i");
 
     // City Filtering
-    if (query.includes("city")) {
-        const cityMatch = query.match(/city\s+([\w\s]+)/);
-        if (cityMatch) filter.city = new RegExp(cityMatch[1], "i");
-    }
+    const cityMatch = query.match(/city\s+([\w\s]+)/i);
+    if (cityMatch) filter.city = new RegExp(cityMatch[1], "i");
 
     // Department Filtering
     const matchedDepartment = departments.find(dept => words.includes(dept));
     if (matchedDepartment) filter.department = new RegExp(matchedDepartment, "i");
 
     // Skill Filtering
-    const matchedSkill = skills.find(skill => words.includes(skill));
-    if (matchedSkill) filter.skillSet = new RegExp(matchedSkill, "i");
+    const matchedSkills = skills.filter(skill => words.includes(stemmer.stem(skill)));
+    if (matchedSkills.length > 0) filter.skillSet = { $in: matchedSkills };
 
     // Education Filtering
     const matchedEducation = educationLevels.find(edu => words.includes(edu));
@@ -78,10 +71,10 @@ app.post("/employees/search", async (req, res) => {
     // Salary Filtering
     const salaryMatch = query.match(/\d+/);
     if (salaryMatch) {
-        const salaryValue = parseInt(salaryMatch[0]);
-        if (words.includes("more") || words.includes("above")) {
+        const salaryValue = parseInt(salaryMatch[0], 10);
+        if (words.includes("more") || words.includes("above") || words.includes("higher")) {
             filter.salary = { $gte: salaryValue };
-        } else if (words.includes("less") || words.includes("below")) {
+        } else if (words.includes("less") || words.includes("below") || words.includes("lower")) {
             filter.salary = { $lte: salaryValue };
         } else {
             filter.salary = salaryValue;
@@ -89,30 +82,33 @@ app.post("/employees/search", async (req, res) => {
     }
 
     // Age Filtering
-    const ageMatch = query.match(/\d+/);
-    if (ageMatch && words.includes("age")) {
-        const ageValue = parseInt(ageMatch[0]);
-        if (words.includes("older") || words.includes("above")) {
+    const ageMatch = query.match(/age\s*(\d+)/);
+    if (ageMatch) {
+        const ageValue = parseInt(ageMatch[1], 10);
+        if (words.includes("older") || words.includes("above") || words.includes("greater")) {
             filter.age = { $gte: ageValue };
-        } else if (words.includes("younger") || words.includes("below")) {
+        } else if (words.includes("younger") || words.includes("below") || words.includes("less")) {
             filter.age = { $lte: ageValue };
         } else {
             filter.age = ageValue;
         }
     }
 
-    // Fetch Employees from MongoDB
-    const employees = await Employee.find(filter);
+    try {
+        // Fetch Employees from MongoDB
+        const employees = await Employee.find(filter);
 
-    // Handle cases where no employees match the query
-    if (employees.length === 0) {
-        return res.status(404).json({ error: "Please ask a valid question." });
+        if (employees.length === 0) {
+            return res.status(404).json({ error: "No matching employees found." });
+        }
+
+        res.json(employees);
+    } catch (error) {
+        res.status(500).json({ error: "Server error while fetching employees." });
     }
-
-    res.json(employees);
 });
 
-
+// Get all employees
 app.get("/employees", async (req, res) => {
     try {
         const employees = await Employee.find();
@@ -122,12 +118,11 @@ app.get("/employees", async (req, res) => {
     }
 });
 
+// Database Connection
 mongoose
     .connect(process.env.MONGO_URI, { dbName: "Employee" })
     .then(() => console.log("MongoDB Connected"))
-    .catch((err) => console.log("MongoDB Connection Error:", err));
+    .catch(err => console.log("MongoDB Connection Error:", err));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () =>
-    console.log(`Server running on port ${PORT}`),
-);
+app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
