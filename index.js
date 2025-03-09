@@ -41,8 +41,8 @@ const Employee = mongoose.model("Employee", EmployeeSchema);
 const insertDummyData = async () => {
     try {
         const count = await Employee.countDocuments();
-        if (count === 0) {
-            const employees = Array.from({ length: 50 }, (_, i) => ({
+        if (count < 50) {
+            const employees = Array.from({ length: 50 - count }, (_, i) => ({
                 name: `Employee ${i + 1}`,
                 email: `employee${i + 1}@company.com`,
                 phone: `98765432${(i % 10) + 1}`,
@@ -57,7 +57,7 @@ const insertDummyData = async () => {
                 education: ['B.Tech', 'M.Tech', 'MBA', 'B.Sc'][i % 4]
             }));
             await Employee.insertMany(employees);
-            console.log("50 Sample Employee Data Inserted!");
+            console.log("Additional Employee Data Inserted to reach 50!");
         }
     } catch (err) {
         console.error("Error inserting dummy data:", err);
