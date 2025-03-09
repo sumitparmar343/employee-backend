@@ -1,10 +1,4 @@
 // Backend: Node.js + Express + MongoDB + NLP (ML-based Search)
-// Frontend: React.js
-// Database: MongoDB Atlas
-
-// 1. Install dependencies
-// Run in terminal: npm install express mongoose cors dotenv natural axios react react-dom
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -38,40 +32,6 @@ const EmployeeSchema = new mongoose.Schema({
 
 const Employee = mongoose.model("Employee", EmployeeSchema);
 
-const insertDummyData = async () => {
-    try {
-        const count = await Employee.countDocuments();
-        if (count < 50) {
-            const employees = Array.from({ length: 50 - count }, (_, i) => ({
-                name: `Employee ${i + 1}`,
-                email: `employee${i + 1}@company.com`,
-                phone: `98765432${(i % 10) + 1}`,
-                state: ['California', 'Texas', 'New York', 'Florida'][i % 4],
-                city: ['Los Angeles', 'Houston', 'New York City', 'Miami'][i % 4],
-                department: ['Engineering', 'HR', 'Marketing', 'Sales'][i % 4],
-                salary: Math.floor(Math.random() * 50000) + 50000,
-                joinDate: new Date(2020 + (i % 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28)),
-                gender: i % 2 === 0 ? 'Male' : 'Female',
-                skillSet: ['JavaScript', 'Python', 'React', 'Node.js', 'SQL'].slice(0, (i % 5) + 1),
-                age: Math.floor(Math.random() * 20) + 22,
-                education: ['B.Tech', 'M.Tech', 'MBA', 'B.Sc'][i % 4]
-            }));
-            await Employee.insertMany(employees);
-            console.log("Additional Employee Data Inserted to reach 50!");
-        }
-    } catch (err) {
-        console.error("Error inserting dummy data:", err);
-    }
-};
-
-// Run this function after DB connection
-mongoose.connection.once("open", insertDummyData);
-
-mongoose
-    .connect(process.env.MONGO_URI, { dbName: "Employee" })
-    .then(() => console.log("MongoDB Connected"))
-    .catch((err) => console.log("MongoDB Connection Error:", err));
-
 // NLP-based Search Functionality
 app.post("/employees/search", async (req, res) => {
     const { query } = req.body;
@@ -89,17 +49,9 @@ app.post("/employees/search", async (req, res) => {
         const salaryMatch = query.match(/\d+/);
         if (salaryMatch) {
             const salaryValue = parseInt(salaryMatch[0]);
-            if (
-                words.includes("more") ||
-                words.includes("above") ||
-                words.includes("greater")
-            ) {
+            if (words.includes("more") || words.includes("above") || words.includes("greater")) {
                 filter.salary = { $gte: salaryValue };
-            } else if (
-                words.includes("less") ||
-                words.includes("below") ||
-                words.includes("lower")
-            ) {
+            } else if (words.includes("less") || words.includes("below") || words.includes("lower")) {
                 filter.salary = { $lte: salaryValue };
             } else {
                 filter.salary = salaryValue;
@@ -110,17 +62,9 @@ app.post("/employees/search", async (req, res) => {
         const ageMatch = query.match(/\d+/);
         if (ageMatch) {
             const ageValue = parseInt(ageMatch[0]);
-            if (
-                words.includes("more") ||
-                words.includes("above") ||
-                words.includes("older")
-            ) {
+            if (words.includes("more") || words.includes("above") || words.includes("older")) {
                 filter.age = { $gte: ageValue };
-            } else if (
-                words.includes("less") ||
-                words.includes("below") ||
-                words.includes("younger")
-            ) {
+            } else if (words.includes("less") || words.includes("below") || words.includes("younger")) {
                 filter.age = { $lte: ageValue };
             } else {
                 filter.age = ageValue;
@@ -140,6 +84,11 @@ app.post("/employees/search", async (req, res) => {
     }
 
     const employees = await Employee.find(filter);
+    
+    if (employees.length === 0) {
+        return res.json({ message: "Please ask a valid question." });
+    }
+
     res.json(employees);
 });
 
@@ -151,6 +100,11 @@ app.get("/employees", async (req, res) => {
         res.status(500).json({ error: "Error fetching employees" });
     }
 });
+
+mongoose
+    .connect(process.env.MONGO_URI, { dbName: "Employee" })
+    .then(() => console.log("MongoDB Connected"))
+    .catch((err) => console.log("MongoDB Connection Error:", err));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () =>
