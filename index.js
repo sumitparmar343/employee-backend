@@ -21,63 +21,6 @@ app.use(
     }),
 );
 
-const insertDummyData = async () => {
-    try {
-        const count = await Employee.countDocuments();
-        if (count === 0) {
-            await Employee.insertMany([
-                {
-                    name: "John Doe",
-                    email: "john@example.com",
-                    phone: "9876543210",
-                    state: "California",
-                    city: "Los Angeles",
-                    department: "IT",
-                    salary: 50000,
-                    joinDate: new Date("2020-01-01"),
-                    gender: "Male",
-                    skillSet: ["React", "Node.js"],
-                    age: 30,
-                    education: "MBA",
-                },
-                {
-                    name: "Jane Smith",
-                    email: "jane@example.com",
-                    phone: "9123456789",
-                    state: "Texas",
-                    city: "Houston",
-                    department: "HR",
-                    salary: 40000,
-                    joinDate: new Date("2019-06-15"),
-                    gender: "Female",
-                    skillSet: ["Communication", "Recruitment"],
-                    age: 28,
-                    education: "BBA",
-                },
-            ]);
-            console.log("Sample employee data inserted!");
-        }
-    } catch (err) {
-        console.error("Error inserting dummy data:", err);
-    }
-};
-
-// Run this function after DB connection
-mongoose.connection.once("open", insertDummyData);
-
-mongoose
-    .connect(process.env.MONGO_URI, { dbName: "Employee" }) // Add your actual database name
-    .then(() => console.log("MongoDB Connected"))
-    .catch((err) => console.log("MongoDB Connection Error:", err));
-
-// mongoose
-//     .connect(process.env.MONGO_URI, {
-//         useNewUrlParser: true,
-//         useUnifiedTopology: true,
-//     })
-//     .then(() => console.log("MongoDB Connected"))
-//     .catch((err) => console.log(err));
-
 const EmployeeSchema = new mongoose.Schema({
     name: String,
     email: String,
@@ -94,6 +37,40 @@ const EmployeeSchema = new mongoose.Schema({
 });
 
 const Employee = mongoose.model("Employee", EmployeeSchema);
+
+const insertDummyData = async () => {
+    try {
+        const count = await Employee.countDocuments();
+        if (count === 0) {
+            const employees = Array.from({ length: 50 }, (_, i) => ({
+                name: `Employee ${i + 1}`,
+                email: `employee${i + 1}@company.com`,
+                phone: `98765432${(i % 10) + 1}`,
+                state: ['California', 'Texas', 'New York', 'Florida'][i % 4],
+                city: ['Los Angeles', 'Houston', 'New York City', 'Miami'][i % 4],
+                department: ['Engineering', 'HR', 'Marketing', 'Sales'][i % 4],
+                salary: Math.floor(Math.random() * 50000) + 50000,
+                joinDate: new Date(2020 + (i % 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28)),
+                gender: i % 2 === 0 ? 'Male' : 'Female',
+                skillSet: ['JavaScript', 'Python', 'React', 'Node.js', 'SQL'].slice(0, (i % 5) + 1),
+                age: Math.floor(Math.random() * 20) + 22,
+                education: ['B.Tech', 'M.Tech', 'MBA', 'B.Sc'][i % 4]
+            }));
+            await Employee.insertMany(employees);
+            console.log("50 Sample Employee Data Inserted!");
+        }
+    } catch (err) {
+        console.error("Error inserting dummy data:", err);
+    }
+};
+
+// Run this function after DB connection
+mongoose.connection.once("open", insertDummyData);
+
+mongoose
+    .connect(process.env.MONGO_URI, { dbName: "Employee" })
+    .then(() => console.log("MongoDB Connected"))
+    .catch((err) => console.log("MongoDB Connection Error:", err));
 
 // NLP-based Search Functionality
 app.post("/employees/search", async (req, res) => {
